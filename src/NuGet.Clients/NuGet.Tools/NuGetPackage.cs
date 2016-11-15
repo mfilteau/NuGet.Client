@@ -83,13 +83,11 @@ namespace NuGetVSExtension
         private OleMenuCommand _managePackageForSolutionDialogCommand;
         private OleMenuCommandService _mcs;
         private bool _powerConsoleCommandExecuting;
+
         private IMachineWideSettings _machineWideSettings;
-
         private NuGetUIProjectContext _uiProjectContext;
-
         private NuGetSettings _nugetSettings;
 
-        private OutputConsoleLogger _outputConsoleLogger;
         private readonly HashSet<Uri> _credentialRequested;
 
         public NuGetPackage()
@@ -142,6 +140,9 @@ namespace NuGetVSExtension
 
         [Import]
         private ISettings Settings { get; set; }
+
+        [Import]
+        private INuGetUILogger OutputConsoleLogger { get; set; }
 
         private ISourceControlManagerProvider SourceControlManagerProvider
         {
@@ -247,21 +248,13 @@ namespace NuGetVSExtension
             Styles.LoadVsStyles();
             Brushes.LoadVsBrushes();
 
-            _outputConsoleLogger = new OutputConsoleLogger(this);
-
-            // ***
-            // VsNuGetDiagnostics.Initialize(
-            //    ServiceLocator.GetInstance<IDebugConsoleController>());
-
             // Add our command handlers for menu (commands must exist in the .vsct file)
             await AddMenuCommandHandlersAsync();
-            await RestorePackagesCommand.InitializeAsync(this, _outputConsoleLogger);
 
             // IMPORTANT: Do NOT do anything that can lead to a call to ServiceLocator.GetGlobalService().
             // Doing so is illegal and may cause VS to hang.
 
             _dte = (DTE)await GetServiceAsync(typeof(SDTE));
-            Debug.Assert(_dte != null);
 
             _dteEvents = _dte.Events.DTEEvents;
             _dteEvents.OnBeginShutdown += OnBeginShutDown;
@@ -269,7 +262,7 @@ namespace NuGetVSExtension
             SetDefaultCredentialProvider();
 
             _uiProjectContext = new NuGetUIProjectContext(
-                _outputConsoleLogger,
+                OutputConsoleLogger,
                 SourceControlManagerProvider,
                 CommonOperations);
 
@@ -383,7 +376,8 @@ namespace NuGetVSExtension
         private void LogCredentialProviderError(Exception exception, string failureMessage)
         {
             // Log the user-friendly message to the output console (no stack trace).
-            _outputConsoleLogger.OutputConsole.WriteLine(
+            OutputConsoleLogger.Log(
+                MessageLevel.Error,
                 failureMessage +
                 Environment.NewLine +
                 ExceptionUtilities.DisplayMessage(exception));
@@ -638,7 +632,7 @@ namespace NuGetVSExtension
             var model = new PackageManagerModel(uiController, uiContext, isSolution: false, editorFactoryGuid: GuidList.guidNuGetEditorType);
             var vsWindowSearchHostfactory = ServiceLocator.GetGlobalService<SVsWindowSearchHostFactory, IVsWindowSearchHostFactory>();
             var vsShell = ServiceLocator.GetGlobalService<SVsShell, IVsShell4>();
-            var control = new PackageManagerControl(model, Settings, vsWindowSearchHostfactory, vsShell, _outputConsoleLogger);
+            var control = new PackageManagerControl(model, Settings, vsWindowSearchHostfactory, vsShell, OutputConsoleLogger);
             var windowPane = new PackageManagerWindowPane(control);
             var guidEditorType = GuidList.guidNuGetEditorType;
             var guidCommandUI = Guid.Empty;
@@ -860,7 +854,7 @@ namespace NuGetVSExtension
             model.SolutionName = solutionName;
             var vsWindowSearchHostfactory = ServiceLocator.GetGlobalService<SVsWindowSearchHostFactory, IVsWindowSearchHostFactory>();
             var vsShell = ServiceLocator.GetGlobalService<SVsShell, IVsShell4>();
-            var control = new PackageManagerControl(model, Settings, vsWindowSearchHostfactory, vsShell, _outputConsoleLogger);
+            var control = new PackageManagerControl(model, Settings, vsWindowSearchHostfactory, vsShell, OutputConsoleLogger);
             var windowPane = new PackageManagerWindowPane(control);
             var guidEditorType = GuidList.guidNuGetEditorType;
             var guidCommandUI = Guid.Empty;

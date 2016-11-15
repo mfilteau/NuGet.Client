@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.ComponentModel.Composition;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio;
@@ -12,9 +11,10 @@ using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Threading;
 using NuGet.PackageManagement.UI;
+using NuGet.PackageManagement.VisualStudio;
 using Task = System.Threading.Tasks.Task;
 
-namespace NuGet.PackageManagement.VisualStudio
+namespace NuGet.SolutionRestoreManager
 {
     /// <summary>
     /// Solution restore job scheduler.
@@ -27,12 +27,12 @@ namespace NuGet.PackageManagement.VisualStudio
         private const int RequestQueueLimit = 150;
         private const int PromoteAttemptsLimit = 150;
 
-        private readonly IServiceProvider _serviceProvider;
         private readonly AsyncLazy<ErrorListProvider> _errorListProvider;
-        private EnvDTE.SolutionEvents _solutionEvents;
-        private readonly IVsSolutionManager _solutionManager;
-        private readonly Common.ILogger _logger;
+        private readonly Lazy<IVsSolutionManager> _solutionManager;
+        private readonly Lazy<Common.ILogger> _logger;
+        private readonly AsyncLazy<IComponentModel> _componentModel;
 
+        private EnvDTE.SolutionEvents _solutionEvents;
         private CancellationTokenSource _workerCts;
         private Lazy<Task> _backgroundJobRunner;
         private Lazy<BlockingCollection<SolutionRestoreRequest>> _pendingRequests;
@@ -54,9 +54,9 @@ namespace NuGet.PackageManagement.VisualStudio
         public SolutionRestoreWorker(
             [Import(typeof(SVsServiceProvider))]
             IServiceProvider serviceProvider,
-            IVsSolutionManager solutionManager,
+            Lazy<IVsSolutionManager> solutionManager,
             [Import(typeof(VisualStudioActivityLogger))]
-            Common.ILogger logger)
+            Lazy<Common.ILogger> logger)
         {
             if (serviceProvider == null)
             {
@@ -73,7 +73,6 @@ namespace NuGet.PackageManagement.VisualStudio
                 throw new ArgumentNullException(nameof(logger));
             }
 
-            _serviceProvider = serviceProvider;
             _solutionManager = solutionManager;
             _logger = logger;
 
@@ -85,6 +84,13 @@ namespace NuGet.PackageManagement.VisualStudio
                 {
                     await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
                     return new ErrorListProvider(serviceProvider);
+                },
+                _joinableFactory);
+
+            _componentModel = new AsyncLazy<IComponentModel>(async () =>
+                {
+                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                    return serviceProvider.GetService<SComponentModel, IComponentModel>();
                 },
                 _joinableFactory);
 
@@ -116,10 +122,7 @@ namespace NuGet.PackageManagement.VisualStudio
             {
                 await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
-                if (_solutionEvents != null)
-                {
-                    _solutionEvents.AfterClosing -= SolutionEvents_AfterClosing;
-                }
+                _solutionEvents.AfterClosing -= SolutionEvents_AfterClosing;
 #if VS15
                 Unadvise();
 #endif
@@ -161,7 +164,7 @@ namespace NuGet.PackageManagement.VisualStudio
                 _pendingRequests = new Lazy<BlockingCollection<SolutionRestoreRequest>>(
                     () => new BlockingCollection<SolutionRestoreRequest>(RequestQueueLimit));
 
-                _pendingRestore = new BackgroundRestoreOperation(blockingUi: false);
+                _pendingRestore = new BackgroundRestoreOperation();
                 _activeRestoreTask = Task.FromResult(true);
                 _restoreJobContext = new SolutionRestoreJobContext();
             }
@@ -176,7 +179,7 @@ namespace NuGet.PackageManagement.VisualStudio
         public async Task<bool> ScheduleRestoreAsync(
             SolutionRestoreRequest request, CancellationToken token)
         {
-            if (_solutionManager.IsSolutionFullyLoaded)
+            if (_solutionManager.Value.IsSolutionFullyLoaded)
             {
                 // start background runner if not yet started
                 // ignore the value
@@ -199,7 +202,7 @@ namespace NuGet.PackageManagement.VisualStudio
             return _joinableFactory.Run(
                 async () =>
                 {
-                    using (var restoreOperation = new BackgroundRestoreOperation(blockingUi: true))
+                    using (var restoreOperation = new BackgroundRestoreOperation())
                     {
                         await PromoteTaskToActiveAsync(restoreOperation, _workerCts.Token);
 
@@ -257,7 +260,7 @@ namespace NuGet.PackageManagement.VisualStudio
                         // Replaces pending restore operation with a new one.
                         // Older value is ignored.
                         var ignore = Interlocked.CompareExchange(
-                            ref _pendingRestore, new BackgroundRestoreOperation(blockingUi: false), restoreOperation);
+                            ref _pendingRestore, new BackgroundRestoreOperation(), restoreOperation);
 
                         token.ThrowIfCancellationRequested();
 
@@ -273,7 +276,7 @@ namespace NuGet.PackageManagement.VisualStudio
                     catch (Exception e)
                     {
                         // Writes stack to activity log
-                        _logger.LogError(e.ToString());
+                        _logger.Value.LogError(e.ToString());
                         // Do not die just yet
                     }
                 }
@@ -288,7 +291,7 @@ namespace NuGet.PackageManagement.VisualStudio
             // Start the restore job in a separate task on a background thread
             // it will switch into main thread when necessary.
             var joinableTask = _joinableFactory.RunAsync(
-                () => StartRestoreJobAsync(request, restoreOperation.BlockingUI, token));
+                () => StartRestoreJobAsync(request, token));
 
             var continuation = joinableTask
                 .Task
@@ -329,17 +332,23 @@ namespace NuGet.PackageManagement.VisualStudio
         }
 
         private async Task<bool> StartRestoreJobAsync(
-            SolutionRestoreRequest jobArgs, bool blockingUi, CancellationToken token)
+            SolutionRestoreRequest request, CancellationToken token)
         {
             await TaskScheduler.Default;
 
+            var componentModel = await _componentModel.GetValueAsync();
+
             using (var jobCts = CancellationTokenSource.CreateLinkedTokenSource(token))
-            using (var logger = await RestoreOperationLogger.StartAsync(
-                _serviceProvider, ErrorListProvider, blockingUi, jobCts))
-            using (var job = await SolutionRestoreJob.CreateAsync(
-                _serviceProvider, logger, jobCts.Token))
             {
-                return await job.ExecuteAsync(jobArgs, _restoreJobContext, jobCts.Token);
+                var logger = componentModel.GetService<RestoreOperationLogger>();
+                await logger.StartAsync(
+                    request.RestoreSource,
+                    ErrorListProvider,
+                    useModalProgressUI: request.UseModalProgressUI,
+                    cts: jobCts);
+
+                var job = componentModel.GetService<ISolutionRestoreJob>();
+                return await job.ExecuteAsync(request, _restoreJobContext, logger, jobCts.Token);
             }
         }
 
@@ -367,13 +376,6 @@ namespace NuGet.PackageManagement.VisualStudio
             public System.Runtime.CompilerServices.TaskAwaiter<bool> GetAwaiter() => Task.GetAwaiter();
 
             public static explicit operator Task<bool>(BackgroundRestoreOperation restoreOperation) => restoreOperation.Task;
-
-            public bool BlockingUI { get; }
-
-            public BackgroundRestoreOperation(bool blockingUi)
-            {
-                BlockingUI = blockingUi;
-            }
 
             public void ContinuationAction(Task<bool> targetTask)
             {

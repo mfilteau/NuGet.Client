@@ -3,10 +3,11 @@
 
 using System;
 using System.ComponentModel.Design;
-using System.Diagnostics;
 using System.Linq;
+using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Shell.Interop;
 using NuGet.PackageManagement;
 using NuGet.PackageManagement.UI;
 using NuGet.PackageManagement.VisualStudio;
@@ -14,36 +15,37 @@ using NuGet.ProjectManagement;
 using NuGetConsole;
 using Task = System.Threading.Tasks.Task;
 
-namespace NuGetVSExtension
+namespace NuGet.SolutionRestoreManager
 {
     /// <summary>
     /// Restore packages menu command handler.
     /// </summary>
-    internal sealed class RestorePackagesCommand
+    internal sealed class SolutionRestoreCommand
     {
-        private static RestorePackagesCommand _instance;
+        private static SolutionRestoreCommand _instance;
 
-        private const int CommandId = PkgCmdIDList.cmdidRestorePackages;
-        private static readonly Guid CommandSet = GuidList.guidNuGetDialogCmdSet;
+        private const int CommandId = 0x300; // cmdidRestorePackages
+        private static readonly Guid CommandSet = new Guid("25fd982b-8cae-4cbd-a440-e03ffccde106"); // guidNuGetDialogCmdSet;
 
-        private readonly NuGetPackage _package;
-        private readonly INuGetUILogger _logger;
+        private readonly Lazy<INuGetUILogger> _logger;
         private readonly Lazy<ISolutionRestoreWorker> _restoreWorker;
         private readonly Lazy<ISolutionManager> _solutionManager;
         private readonly Lazy<IConsoleStatus> _consoleStatus;
+
+        private readonly IVsMonitorSelection _vsMonitorSelection;
+        private uint _solutionNotBuildingAndNotDebuggingContextCookie;
 
         private ISolutionRestoreWorker SolutionRestoreWorker => _restoreWorker.Value;
         private ISolutionManager SolutionManager => _solutionManager.Value;
         private IConsoleStatus ConsoleStatus => _consoleStatus.Value;
 
-        private RestorePackagesCommand(
-            NuGetPackage package,
+        private SolutionRestoreCommand(
             IComponentModel componentModel,
             IMenuCommandService commandService,
-            INuGetUILogger logger)
+            IVsMonitorSelection vsMonitorSelection)
         {
-            _package = package;
-            _logger = logger;
+            _logger = new Lazy<INuGetUILogger>(
+                () => componentModel.GetService<INuGetUILogger>());
 
             _restoreWorker = new Lazy<ISolutionRestoreWorker>(
                 () => componentModel.GetService<ISolutionRestoreWorker>());
@@ -58,28 +60,30 @@ namespace NuGetVSExtension
             var menuItem = new OleMenuCommand(
                 OnRestorePackages, null, BeforeQueryStatusForPackageRestore, menuCommandId);
             commandService?.AddCommand(menuItem);
+
+            _vsMonitorSelection = vsMonitorSelection;
+
+            // get the solution not building and not debugging cookie
+            Guid guid = VSConstants.UICONTEXT.SolutionExistsAndNotBuildingAndNotDebugging_guid;
+            _vsMonitorSelection.GetCmdUIContextCookie(ref guid, out _solutionNotBuildingAndNotDebuggingContextCookie);
         }
 
         /// <summary>
         /// Initializes the singleton instance of the command.
         /// </summary>
         /// <param name="package">Owner package, not null.</param>
-        public static async Task InitializeAsync(NuGetPackage package, INuGetUILogger logger)
+        public static async Task InitializeAsync(AsyncPackage package)
         {
             if (package == null)
             {
                 throw new ArgumentNullException(nameof(package));
             }
 
-            if (logger == null)
-            {
-                throw new ArgumentNullException(nameof(logger));
-            }
-
             var componentModel = await package.GetServiceAsync(typeof(SComponentModel)) as IComponentModel;
-            var commandService = await package.GetServiceAsync(typeof(IMenuCommandService)) as OleMenuCommandService;
+            var commandService = await package.GetServiceAsync(typeof(IMenuCommandService)) as IMenuCommandService;
+            var vsMonitorSelection = await package.GetServiceAsync(typeof(IVsMonitorSelection)) as IVsMonitorSelection;
 
-            _instance = new RestorePackagesCommand(package, componentModel, commandService, logger);
+            _instance = new SolutionRestoreCommand(componentModel, commandService, vsMonitorSelection);
         }
 
         /// <summary>
@@ -99,7 +103,7 @@ namespace NuGetVSExtension
             {
                 // QueryStatus should disable the context menu in most of the cases.
                 // Except when NuGetPackage was not loaded before VS won't send QueryStatus.
-                _logger.Log(MessageLevel.Info, Resources.SolutionRestoreFailed_RestoreWorkerIsBusy);
+                _logger.Value.Log(MessageLevel.Info, Resources.SolutionRestoreFailed_RestoreWorkerIsBusy);
             }
         }
 
@@ -120,9 +124,16 @@ namespace NuGetVSExtension
                 // even in DPL mode. See https://github.com/NuGet/Home/issues/3711
                 command.Enabled = !ConsoleStatus.IsBusy &&
                     !SolutionRestoreWorker.IsBusy &&
-                    _package.IsSolutionExistsAndNotDebuggingAndNotBuilding() &&
+                    IsSolutionExistsAndNotDebuggingAndNotBuilding() &&
                     (SolutionManager.IsSolutionDPLEnabled || SolutionManager.GetNuGetProjects().Any());
             });
+        }
+
+        private bool IsSolutionExistsAndNotDebuggingAndNotBuilding()
+        {
+            int pfActive;
+            var result = _vsMonitorSelection.IsCmdUIContextActive(_solutionNotBuildingAndNotDebuggingContextCookie, out pfActive);
+            return (result == VSConstants.S_OK && pfActive > 0);
         }
     }
 }

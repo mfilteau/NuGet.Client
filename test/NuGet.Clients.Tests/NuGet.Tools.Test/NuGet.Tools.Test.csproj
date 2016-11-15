@@ -10,8 +10,8 @@
     <ProjectGuid>{5E2D927E-87E3-431A-A062-16DF6EC98BFB}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>NuGet.VsExtension.Test</RootNamespace>
-    <AssemblyName>NuGet.VsExtension.Test</AssemblyName>
+    <RootNamespace>NuGet.Tools.Test</RootNamespace>
+    <AssemblyName>NuGet.Tools.Test</AssemblyName>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{3AC096D0-A1C2-E12C-1390-A8335801FDAB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <ReferencePath>$(ProgramFiles)\Common Files\microsoft shared\VSTT\$(VisualStudioVersion)\UITestExtensionPackages</ReferencePath>
@@ -46,7 +46,7 @@
       <Project>{e5556bc6-a7fd-4d8e-8a7d-7648df1d7471}</Project>
       <Name>NuGet.VisualStudio</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\..\src\NuGet.Clients\VsExtension\NuGet.Tools.csproj">
+    <ProjectReference Include="..\..\..\src\NuGet.Clients\NuGet.Tools\NuGet.Tools.csproj">
       <Project>{d0f9864b-d782-4471-81a2-29555e5dc0d7}</Project>
       <Name>NuGet.Tools</Name>
     </ProjectReference>

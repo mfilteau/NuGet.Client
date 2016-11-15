@@ -178,15 +178,6 @@ namespace NuGetVSExtension {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to ========== Finished ==========.
-        /// </summary>
-        internal static string Finished {
-            get {
-                return ResourceManager.GetString("Finished", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to Manage NuGet Packages for &amp;Solution....
         /// </summary>
         internal static string ManagePackageForSolutionLabel {
@@ -300,15 +291,6 @@ namespace NuGetVSExtension {
         internal static string SolutionIsNotSavedPromptReopen {
             get {
                 return ResourceManager.GetString("SolutionIsNotSavedPromptReopen", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Solution Restore cannot be started while an automatic restore is in progress..
-        /// </summary>
-        internal static string SolutionRestoreFailed_RestoreWorkerIsBusy {
-            get {
-                return ResourceManager.GetString("SolutionRestoreFailed_RestoreWorkerIsBusy", resourceCulture);
             }
         }
     }

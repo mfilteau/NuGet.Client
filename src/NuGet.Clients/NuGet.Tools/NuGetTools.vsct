@@ -3,7 +3,7 @@
   <Extern href="stdidcmd.h"/>
   <Extern href="vsshlids.h"/>
 
-  <Commands package="guidPowerConsolePkg">
+  <Commands package="guidNuGetPackage">
 
     <Menus>
       <!-- This is the toolbar in the console -->
@@ -43,14 +43,6 @@
           <ButtonText>Package Manager C&amp;onsole</ButtonText>
         </Strings>
       </Button>
-
-      <!--<Button guid="guidNuGetDebugConsoleCmdSet" id="cmdidDebugConsole" priority="0x0900" type="Button">
-        <Icon guid="guidToolbarImages" id="bmpPowerConsole" />
-        <CommandFlag>AllowParams</CommandFlag>
-        <Strings>
-          <ButtonText>Package Manager D&amp;ebug Console</ButtonText>
-        </Strings>
-      </Button>-->
 
       <Button guid="guidPowerConsoleCmdSet" id="cmdidSourceSettings" priority="0x1020" type="Button">
         <Parent guid="guidPowerConsoleCmdSet" id="idToolbarHostsGroup"/>
@@ -98,17 +90,6 @@
         </Strings>
       </Button>
 
-      <Button guid="guidDialogCmdSet" id="cmdidRestorePackages" priority="0x0300" type="Button">
-        <Parent guid="guidReferenceContext" id="cmdAddReferenceGroup" />
-        <Icon guid="guidToolbarImages" id="bmpPackageRestore" />
-        <CommandFlag>DefaultInvisible</CommandFlag>
-        <CommandFlag>DynamicVisibility</CommandFlag>
-        <Strings>
-          <CommandName>cmdRestorePackages</CommandName>
-          <ButtonText>Restore NuGet Packa&amp;ges</ButtonText>
-        </Strings>
-      </Button>
-
       <Button guid="guidToolsGroup" id="idGeneralSettings" priority="0xF200" type="Button">
         <Parent guid="guidToolsGroup" id="idToolsGroup"/>
         <Icon guid="guidToolbarImages" id="bmpSourceSettings" />
@@ -117,18 +98,6 @@
           <ButtonText>&amp;Package Manager Settings</ButtonText>
         </Strings>
       </Button>
-
-      <!--<Button guid="guidToolsGroup" id="cmdIdVisualizer" priority="0xF150" type="Button">
-          <Parent guid="guidToolsGroup" id="idToolsGroup" />
-          <Icon guid="guidToolbarImages" id="bmpVisualizer" />
-          <CommandFlag>DefaultInvisible</CommandFlag>
-          <CommandFlag>DynamicVisibility</CommandFlag>
-          <CommandFlag>IconAndText</CommandFlag>
-          <Strings>
-            <CommandName>cmdIdVisualizer</CommandName>
-            <ButtonText>Package &amp;Visualizer</ButtonText>
-          </Strings>
-        </Button>-->
     </Buttons>
 
     <Combos>
@@ -154,11 +123,26 @@
     </Bitmaps>
   </Commands>
 
+  <Commands package="guidRestoreManagerPackage">
+    <Buttons>
+      <Button guid="guidDialogCmdSet" id="cmdidRestorePackages" priority="0x0300" type="Button">
+        <Parent guid="guidReferenceContext" id="cmdAddReferenceGroup" />
+        <Icon guid="guidToolbarImages" id="bmpPackageRestore" />
+        <CommandFlag>DefaultInvisible</CommandFlag>
+        <CommandFlag>DefaultDisabled</CommandFlag>
+        <CommandFlag>DynamicVisibility</CommandFlag>
+        <Strings>
+          <CommandName>cmdRestorePackages</CommandName>
+          <ButtonText>Restore NuGet Packa&amp;ges</ButtonText>
+        </Strings>
+      </Button>
+    </Buttons>
+  </Commands>
+  
   <VisibilityConstraints>
     <VisibilityItem guid="guidDialogCmdSet" id="cmdidAddPackages" context="UICONTEXT_SolutionExistsAndNotBuildingAndNotDebugging" />
     <VisibilityItem guid="guidDialogCmdSet" id="cmdidAddPackagesForSolution" context="UICONTEXT_SolutionExistsAndNotBuildingAndNotDebugging" />
     <VisibilityItem guid="guidDialogCmdSet" id="cmdidRestorePackages" context="UICONTEXT_SolutionExistsAndNotBuildingAndNotDebugging" />
-    <VisibilityItem guid="guidToolsGroup" id="cmdIdVisualizer" context="UICONTEXT_SolutionExists" />
   </VisibilityConstraints>
 
   <CommandPlacements>
@@ -201,7 +185,8 @@
   </CommandPlacements>
 
   <Symbols>
-    <GuidSymbol name="guidPowerConsolePkg" value="{5fcc8577-4feb-4d04-ad72-d6c629b083cc}" />
+    <GuidSymbol name="guidNuGetPackage" value="{5fcc8577-4feb-4d04-ad72-d6c629b083cc}" />
+    <GuidSymbol name="guidRestoreManagerPackage" value="{2b52ac92-4551-426d-bd34-c6d7d9fdd1c5}" />
     <GuidSymbol name="guidPowerConsoleCmdSet" value="{1E8A55F6-C18D-407F-91C8-94B02AE1CED6}">
       <IDSymbol name="idToolbar" value="0x1010"/>
       <IDSymbol name="idToolbarHostsGroup" value="0x2000"/>
@@ -229,7 +214,6 @@
       <IDSymbol name="idLibraryPackageManager" value="0x100" />
       <IDSymbol name="idToolsGroup" value="0x200" />
       <IDSymobl name="idGeneralSettings" value="0x300" />
-      <IDSymobl name="cmdIdVisualizer" value="0x310" />
     </GuidSymbol>
     <GuidSymbol name="guidDialogCmdSet" value="{25fd982b-8cae-4cbd-a440-e03ffccde106}">
       <IDSymbol name="cmdidAddPackages" value="0x0100" />
