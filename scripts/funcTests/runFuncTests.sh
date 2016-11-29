@@ -82,7 +82,7 @@ NuGetExe="$(pwd)/.nuget/nuget.exe"
 wget -O $NuGetExe https://dist.nuget.org/win-x86-commandline/latest-prerelease/nuget.exe 
 
 #restore solution packages
-mono $NuGetExe restore  "$(pwd)/.nuget/nuget.exe" -SolutionDirectory "$(pwd)"
+mono $NuGetExe restore  "$(pwd)/.nuget/packages.config" -SolutionDirectory "$(pwd)"
 
 popd
 
