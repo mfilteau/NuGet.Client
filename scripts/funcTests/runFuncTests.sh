@@ -79,7 +79,7 @@ XunitConsole="$(pwd)/packages/xunit.runner.console.2.1.0/tools/xunit.console.exe
 NuGetExe="$(pwd)/.nuget/nuget.exe"
 
 #Get NuGet.exe
-wget https://dist.nuget.org/win-x86-commandline/latest-prerelease/nuget.exe -OutFile $NuGetExe
+wget -O $NuGetExe https://dist.nuget.org/win-x86-commandline/latest-prerelease/nuget.exe 
 
 #restore solution packages
 mono $NuGetExe restore  "$(pwd)/.nuget/nuget.exe" -SolutionDirectory "$(pwd)"
