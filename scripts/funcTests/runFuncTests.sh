@@ -84,6 +84,13 @@ wget -O $NuGetExe https://dist.nuget.org/win-x86-commandline/latest-prerelease/n
 #restore solution packages
 mono $NuGetExe restore  "$(pwd)/.nuget/packages.config" -SolutionDirectory "$(pwd)"
 
+#clean System dll
+rm -r -f "$TestDir/System.*" "$TestDir/WindowsBase.dll" "$TestDir/Microsoft.CSharp.dll" "$TestDir/Microsoft.Build.Engine.dll"
+
+#Run xunit test
+
+mono $XunitConsole "$TestDir/NuGet.CommandLine.Test.dll"
+
 popd
 
 exit $RESULTCODE
